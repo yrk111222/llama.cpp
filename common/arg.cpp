@@ -365,12 +365,12 @@ static handle_model_result common_params_handle_model(struct common_params_model
     } else if (!model.ms_repo.empty()) {
         // Handle ModelScope repository
         // Split the repo ID to extract clean repo and quantization tag
-        auto [clean_repo, quant_tag] = common_download_split_repo_tag(model.ms_repo);
+        auto [ms_repo, ms_tag] = common_download_split_repo_tag(model.ms_repo);
         
         // Use the complete original value for model name
         model.name = model.ms_repo;
         
-        std::string model_path = ms::download_model(clean_repo, model.ms_file, offline, quant_tag);
+        std::string model_path = ms::download_model(ms_repo, model.hf_file, offline, ms_tag, bearer_token);
         
         if (model_path.empty()) {
             LOG_ERR("error: failed to download model from ModelScope\n");
@@ -479,6 +479,14 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
                 throw std::invalid_argument(string_format(
                     "error while handling environment variable \"%s\": %s\n\n", opt.env, e.what()));
             }
+        }
+    }
+
+    // Handle MS_TOKEN environment variable for ModelScope authentication
+    if (params.hf_token.empty()) {
+        const char * ms_token = std::getenv("MS_TOKEN");
+        if (ms_token) {
+            params.hf_token = ms_token;
         }
     }
 
@@ -2676,14 +2684,6 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.model.ms_repo = value;
         }
     ).set_env("LLAMA_ARG_MS_REPO"));
-    add_opt(common_arg(
-        {"-msf", "--ms-file"}, "FILE",
-        "Specify a specific ModelScope file to download (default: automatically select based on quantization preference)\n"
-        "(default: unused)",
-        [](common_params & params, const std::string & value) {
-            params.model.ms_file = value;
-        }
-    ).set_env("LLAMA_ARG_MS_FILE"));
     add_opt(common_arg(
         {"--context-file"}, "FNAME",
         "file to load context from (use comma-separated values to specify multiple files)",
